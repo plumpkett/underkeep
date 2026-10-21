@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Underkeep</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <canvas id="game" width="1000" height="720"></canvas>
+      <div id="overlay" class="hidden">
+        <h1 id="overlay-title"></h1>
+        <p id="overlay-text"></p>
+        <button id="restart">Play again</button>
+      </div>
+    </div>
+    <aside id="panel">
+      <h1>UNDERKEEP</h1>
+      <p class="tag">Dig. Build. Corrupt. Defend the Heart.</p>
+
+      <section class="stats">
+        <div class="stat"><span>Gold</span><b id="gold">0</b></div>
+        <div class="stat"><span>Creatures</span><b id="creatures">0</b></div>
+        <div class="stat"><span>Wave</span><b id="wave">0</b></div>
+        <div class="stat"><span>Next raid</span><b id="next-wave">—</b></div>
+        <div class="bar"><div id="heart-bar"></div><span id="heart-text">Heart</span></div>
+      </section>
+
+      <section class="tools">
+        <h2>Hand of Evil</h2>
+        <div class="grid">
+          <button class="tool active" data-tool="dig" title="Mark rock for your imps to dig (1)">⛏ Dig <kbd>1</kbd></button>
+          <button class="tool" data-tool="5" title="Lair, 100g/tile (2)">🛏 Lair <kbd>2</kbd></button>
+          <button class="tool" data-tool="6" title="Hatchery, 100g/tile (3)">🥚 Hatchery <kbd>3</kbd></button>
+          <button class="tool" data-tool="7" title="Treasury, 50g/tile (4)">💰 Treasury <kbd>4</kbd></button>
+          <button class="tool" data-tool="8" title="Training Room, 150g/tile (5)">⚔ Training <kbd>5</kbd></button>
+          <button class="tool" data-tool="sell" title="Sell rooms for half price (6)">↩ Sell <kbd>6</kbd></button>
+        </div>
+        <button id="summon-imp" class="wide">Summon Imp <span id="imp-cost"></span></button>
+        <div class="speed">
+          <button data-speed="0">⏸</button>
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="2">2×</button>
+          <button data-speed="3">3×</button>
+        </div>
+      </section>
+
+      <section class="log"><h2>Whispers</h2><ul id="log"></ul></section>
+
+      <section class="help">
+        <p><b>Left-drag</b> on rock to mark it for digging. Imps dig it, claim the floor and haul gold.</p>
+        <p><b>Click</b> a creature to pick it up; click your floor to drop it. <b>Right-click</b> slaps it.</p>
+        <p>Claim the <b>Portal</b> to attract creatures. They need a Lair and a Hatchery. Heroes arrive from the gate on the right.</p>
+      </section>
+    </aside>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
