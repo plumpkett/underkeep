@@ -6,7 +6,7 @@ import { findPath } from './pathfinding.js';
 
 const GOLD_PER_VEIN = 250;
 const IMP_CARRY_MAX = 500;
-const HEART_MAX = 1000;
+export const HEART_MAX = 2000;
 const WAVES_TO_WIN = 10;
 
 const walkCost = t => (isPassable(t.type) ? 1 : Infinity);

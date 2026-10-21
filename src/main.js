@@ -1,34 +1,31 @@
-// Entry point: wires input, UI panel and the frame loop to the Game.
+// Entry point: wires input, UI panel and the frame loop to the Game and the 3D renderer.
 
-import { Game } from './game.js';
-import { Renderer } from './render.js';
-import { TILE, W, H, ROOMS, T, isWall } from './map.js';
+import { Game, HEART_MAX } from './game.js';
+import { Renderer3D } from './render3d.js';
+import { T } from './map.js';
 
 const canvas = document.getElementById('game');
 const game = new Game();
-const renderer = new Renderer(canvas, game);
+const renderer = new Renderer3D(canvas, game);
 window.game = game; // handy for poking at from the console
 
-// ---- layout: scale the canvas to fit the stage ----
-function fit() {
-  const stage = document.getElementById('stage');
-  const s = Math.min(1, (stage.clientWidth - 24) / canvas.width, (stage.clientHeight - 24) / canvas.height);
-  canvas.style.width = `${canvas.width * s}px`; canvas.style.height = `${canvas.height * s}px`;
-}
-window.addEventListener('resize', fit); fit();
+window.addEventListener('resize', () => renderer.resize());
+renderer.resize();
 
-// ---- input ----
-function tileFromEvent(ev) {
-  const r = canvas.getBoundingClientRect();
-  const fx = (ev.clientX - r.left) / r.width * W, fy = (ev.clientY - r.top) / r.height * H;
-  return { x: Math.max(0, Math.min(W - 1, Math.floor(fx))), y: Math.max(0, Math.min(H - 1, Math.floor(fy))), fx, fy };
-}
+// ---- mouse ----
+let panning = null;
 canvas.addEventListener('contextmenu', ev => ev.preventDefault());
-canvas.addEventListener('mousemove', ev => { game.hover = tileFromEvent(ev); });
-canvas.addEventListener('mouseleave', () => { game.hover = null; });
+canvas.addEventListener('mousemove', ev => {
+  if (panning) { renderer.pan(ev.clientX - panning.x, ev.clientY - panning.y); panning = { x: ev.clientX, y: ev.clientY }; return; }
+  game.hover = renderer.pick(ev.clientX, ev.clientY);
+});
+canvas.addEventListener('mouseleave', () => { game.hover = null; panning = null; });
+canvas.addEventListener('wheel', ev => { ev.preventDefault(); renderer.zoom(ev.deltaY); }, { passive: false });
 canvas.addEventListener('mousedown', ev => {
+  if (ev.button === 1) { ev.preventDefault(); panning = { x: ev.clientX, y: ev.clientY }; return; }
   if (game.over) return;
-  const p = tileFromEvent(ev);
+  const p = renderer.pick(ev.clientX, ev.clientY);
+  if (!p) return;
   if (ev.button === 2) {
     if (game.held) { game.drop(game.held.tx, game.held.ty); game.held = null; return; }
     const e = game.entityAt(p.fx, p.fy);
@@ -43,14 +40,18 @@ canvas.addEventListener('mousedown', ev => {
   game.drag = { x: p.x, y: p.y, mark: game.tool === 'dig' ? !(tile && tile.marked) : undefined };
 });
 window.addEventListener('mouseup', ev => {
+  if (ev.button === 1) { panning = null; return; }
   if (!game.drag) return;
   const end = game.hover || game.drag;
   game.applyRect(game.drag.x, game.drag.y, end.x, end.y, game.tool);
   game.drag = null;
 });
+
+// ---- keyboard ----
 window.addEventListener('keydown', ev => {
   if (ev.target.tagName === 'INPUT') return;
   const k = ev.key;
+  renderer.keys.set(k.length === 1 ? k.toLowerCase() : k, true);
   if (k === '1') setTool('dig');
   else if (k === '2') setTool(String(T.LAIR));
   else if (k === '3') setTool(String(T.HATCHERY));
@@ -60,7 +61,11 @@ window.addEventListener('keydown', ev => {
   else if (k === ' ') { ev.preventDefault(); setSpeed(game.speed === 0 ? (lastSpeed || 1) : 0); }
   else if (k === 'Escape') { if (game.held) { game.drop(game.held.tx, game.held.ty); game.held = null; } setTool('dig'); }
   else if (k === 'i') game.summonImp();
+  else if (k === 'h') { renderer.cam.x = game.map.heart.x + 0.5; renderer.cam.z = game.map.heart.y + 0.5; }
+  if (k.startsWith('Arrow')) ev.preventDefault();
 });
+window.addEventListener('keyup', ev => { const k = ev.key; renderer.keys.set(k.length === 1 ? k.toLowerCase() : k, false); });
+window.addEventListener('blur', () => renderer.keys.clear());
 
 // ---- panel ----
 const $ = id => document.getElementById(id);
@@ -73,11 +78,12 @@ function setSpeed(s) {
   if (s > 0) lastSpeed = s;
   game.speed = s;
   document.querySelectorAll('.speed button').forEach(b => b.classList.toggle('active', +b.dataset.speed === s));
+  $('paused').classList.toggle('hidden', s !== 0);
 }
 document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
 document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => setSpeed(+b.dataset.speed)));
 $('summon-imp').addEventListener('click', () => game.summonImp());
-$('restart').addEventListener('click', () => { game.reset(); setTool('dig'); setSpeed(1); $('overlay').classList.add('hidden'); });
+$('restart').addEventListener('click', () => { location.reload(); });
 
 let lastLog = null;
 function updatePanel() {
@@ -86,8 +92,8 @@ function updatePanel() {
   $('wave').textContent = game.wave;
   $('next-wave').textContent = game.nextWave === Infinity ? 'final' : `${Math.ceil(game.nextWave)}s`;
   const hp = Math.max(0, game.heartHp);
-  $('heart-bar').style.width = `${hp / 10}%`;
-  $('heart-text').textContent = `Heart ${Math.ceil(hp)} / 1000`;
+  $('heart-bar').style.width = `${hp / HEART_MAX * 100}%`;
+  $('heart-text').textContent = `Heart ${Math.ceil(hp)} / ${HEART_MAX}`;
   $('imp-cost').textContent = `(${game.impCost}g)`;
   $('summon-imp').disabled = game.gold < game.impCost;
   const first = game.messages[0];
@@ -105,8 +111,7 @@ function updatePanel() {
         : `The heroes have breached your Dungeon Heart after ${game.wave} raids. The dark remembers; try again.`;
     }
   }
-  // cursor hint
-  canvas.style.cursor = game.held ? 'grabbing' : 'crosshair';
+  canvas.style.cursor = game.held ? 'grabbing' : panning ? 'move' : 'crosshair';
 }
 
 // ---- loop ----
@@ -118,7 +123,7 @@ function frame(now) {
   let n = 0;
   while (acc >= step && n++ < 12) { game.update(step); acc -= step; }
   if (n >= 12) acc = 0;
-  renderer.draw(now / 1000);
+  renderer.draw(now / 1000, real);
   updatePanel();
   requestAnimationFrame(frame);
 }
